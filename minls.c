@@ -2,14 +2,25 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <fs/super.h>
 
-static char *imagefile, *part, *subpart;
+static char *imagefile_string, *part = NULL, *subpart == NULL;
 static char *path = "/";
 
 
 int main(int argc, char **argv) {
-   
+   FILE *fp; 
+   struct superblock s_block;
    handle_args(argc, argv);
+   imagefile = file_open_read(imagefile);
+   
+   /* TODO: Handle file partitions if needed */
+   if(part)
+      handle_partitions();
+   
+   /* For now, assuming there is no partitions */
+   
+   s_block = validate_superblock(imagefile);
    return 0;
 }
 
@@ -58,19 +69,54 @@ void handle_args(int argc, char **argv) {
    }
 
    /* First unflagged arg is imagefile */
-   if(optind < argc) {
-      imagefile = argv[optind];
-   }
+   if(optind < argc)
+      imagefile_string = argv[optind];
+   
    /* Second optional unflagged arg is the path */
-   if(optind + 1 < argc) {
+   if(optind + 1 < argc)
       path = argv[optind + 1];
-   }
 }
 
 
+FILE *file_open_read(char *filename) {
+   FILE *fp;
+   if(!(fp = fopen(filename, "r"))) {
+      perror(NULL);
+      exit(errno);
+   }
+   return fp;
+}
+
+   
 /* Called if partitioning is requested */
-void find_partitions() {
+void handle_partitions() {
       
+}
+
+
+struct superblock validate_superblock(FILE *imagefile) {
+   struct superblock s_block;
+   fpos_t position = SUPERBLOCK_ADDR;
+   
+   /* Set file position to begining of superblock */
+   if(fsetpos(imagefile, &position) != 0) {
+      perror(NULL);
+      exit(errno);
+   }
+   
+   /* Read in superblock struct from imagefile */
+   if(fread(&s_block, sizeof(struct superblock), 1, imagefile) != sizeof(struct superblock)) {
+      fprintf(stderr, "Unable to read superblock\n");
+      exit(-1);
+   }
+   
+   /* Verify this is a valid MINIX superblock */
+   if(s_block.magic != 0x4D5A) {
+      fprintf(stderr, "Not a valid MINIX superblock\n");
+      exit(-1);
+   }
+   
+   return s_block;
 }
 
 
