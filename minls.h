@@ -2,6 +2,7 @@
 #define MINLS_H
 
 #define SUPERBLOCK_ADDR 1024
+#define INODE_SIZE 64
 
 void handle_args(int argc, char **arg);
 FILE *file_open_read(char *filename);

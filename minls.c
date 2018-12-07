@@ -11,6 +11,8 @@ static char *path = "/";
 int main(int argc, char **argv) {
    FILE *fp; 
    struct superblock s_block;
+   int zone_size, inode_map_size, zone_map_size, blocksize, inode_table_size;
+   int inode_table_addr;
    handle_args(argc, argv);
    imagefile = file_open_read(imagefile);
    
@@ -20,7 +22,17 @@ int main(int argc, char **argv) {
    
    /* For now, assuming there is no partitions */
    
+   /* Get the superblock from the imagefile and verify it is a valid MINIX block */
    s_block = validate_superblock(imagefile);
+   /* Grab constants from the superblock */
+   blocksize = s_blok.blocksize;
+   zone_size = blocksize << s_block.log_zone_size;
+   inode_map_size = s_block.i_blocks * blocksize;
+   zone_map_size = s_block.z_blocks * blocksize;
+   inode_table_addr = (SUPERBLOCK_ADDR * 2) + inode_map_size + zone_map_size;
+   inode_table_size = s_block.ninodes * INODE_SIZE / blocksize;
+      
+      
    return 0;
 }
 
