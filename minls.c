@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <fs/super.h>
 
-static char *imagefile_string, *part = NULL, *subpart == NULL;
+static char *imagefile_string, *part = NULL, *subpart = NULL;
 static char *path = "/";
 
 
@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
    /* Read in the root inode from the imagefile */
    if(fread(&current_inode, sizeof(struct inode), 1, imagefile) != sizeof(struct inode)) {
       fprintf(stderr, "Unable to read root inode\n");
-      exit(-1);
+      exit(EXIT_FAILURE);
    }
    
    if(strncmp(path, "/", 1) == 0) {
@@ -53,10 +53,13 @@ int main(int argc, char **argv) {
    
    while(!file_found) {
       /* TODO: Grab next directory/file in path, save as file_name */
+
       
    }
    
-   /* Current inode is the one we want to list */   
+   /* Current inode is the one we want to list */ 
+
+   //
       
    return 0;
 }
@@ -65,7 +68,7 @@ int main(int argc, char **argv) {
 /* Handles the arguments passed in */
 void handle_args(int argc, char **argv) {
    extern char *optarg;
-   extern int optid;
+   extern int optind;
    int c, error = 0;
    int pflag = 0, sflag=0, vflag=0;
    static char usage[] = "usage: %s [-v] [-p part [-s subpart]] imagefile [path]";
@@ -148,7 +151,7 @@ struct superblock validate_superblock(FILE *imagefile) {
    }
    
    /* Verify this is a valid MINIX superblock */
-   if(s_block.magic != 0x4D5A) {
+   if(s_block.magic != MINIX_MAGIC) {
       fprintf(stderr, "Not a valid MINIX superblock\n");
       exit(-1);
    }
