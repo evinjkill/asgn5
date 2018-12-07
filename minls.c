@@ -9,12 +9,14 @@ static char *path = "/";
 
 
 int main(int argc, char **argv) {
-   FILE *fp; 
+   FILE *imagefile; 
    struct superblock s_block;
    int zone_size, inode_map_size, zone_map_size, blocksize, inode_table_size;
-   int inode_table_addr;
+   fpos_t inode_table_addr;
+   int path_size;
+   struct inode current_inode;
    handle_args(argc, argv);
-   imagefile = file_open_read(imagefile);
+   imagefile = file_open_read(imagefile_string);
    
    /* TODO: Handle file partitions if needed */
    if(part)
@@ -31,7 +33,30 @@ int main(int argc, char **argv) {
    zone_map_size = s_block.z_blocks * blocksize;
    inode_table_addr = (SUPERBLOCK_ADDR * 2) + inode_map_size + zone_map_size;
    inode_table_size = s_block.ninodes * INODE_SIZE / blocksize;
+   
+   
+   /* Set file position to begining of the inodes */
+   if(fsetpos(imagefile, &inode_table_addr) != 0) {
+      perror(NULL);
+      exit(errno);
+   }
+   
+   /* Read in the root inode from the imagefile */
+   if(fread(&current_inode, sizeof(struct inode), 1, imagefile) != sizeof(struct inode)) {
+      fprintf(stderr, "Unable to read root inode\n");
+      exit(-1);
+   }
+   
+   if(strncmp(path, "/", 1) == 0) {
+      file_found = 1;
+   }
+   
+   while(!file_found) {
+      /* TODO: Grab next directory/file in path, save as file_name */
       
+   }
+   
+   /* Current inode is the one we want to list */   
       
    return 0;
 }
