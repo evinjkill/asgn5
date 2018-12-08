@@ -1,5 +1,5 @@
-#ifndef MINLS_H
-#define MINLS_H
+#ifndef MINFS_H
+#define MINFS_H
 
 #define SUPERBLOCK_ADDR 1024
 #define INODE_SIZE 64
@@ -57,7 +57,10 @@ struct inode { /* Sucture of a minix inode on disk */
     uint32_t unused;
 };
 
-
+struct dirent { /* MINIX 3 directory entry */
+   uint32_t inode;
+   unsigned char name[60];
+};
 
 void handle_args(int argc, char **arg);
 FILE *file_open_read(char *filename);
