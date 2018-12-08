@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
    int inode_table_addr;
    int file_found = 0;
    int path_size;
-   
+   int block_index;
    fpos_t *pos;
    struct inode current_inode;
 
@@ -37,24 +37,48 @@ int main(int argc, char **argv) {
    
    /* Get the superblock from the imagefile and verify it is a valid MINIX block */
    s_block = validate_superblock(imagefile);
+
+   /* If verbose, print the useful info from the superblock. */
+   if(verbose) {
+      printf("\n");
+      printf("Superblock Contents:\n");
+      printf("Stored Fields:\n");
+      printf("  ninodes %12u\n",s_block.ninodes);
+      printf("  i_blocks %11d\n",s_block.i_blocks);
+      printf("  z_blocks %11d\n",s_block.z_blocks);
+      printf("  firstdata %10u\n",s_block.firstdata);
+      printf("  log_zone_size %6d\n",s_block.log_zone_size);
+      printf("  max_file %11u\n",s_block.max_file);
+      printf("  magic         0x%x\n",s_block.magic);
+      printf("  zones %14u\n",s_block.zones);
+      printf("  blocksize %10u\n",s_block.blocksize);
+      printf("  subversion %9u\n",s_block.subversion);
+      printf("\n");
+   }
+
    /* Grab constants from the superblock */
    blocksize = s_block.blocksize;
    zone_size = blocksize << s_block.log_zone_size;
    inode_map_size = s_block.i_blocks * blocksize;
    zone_map_size = s_block.z_blocks * blocksize;
-   inode_table_addr = (SUPERBLOCK_ADDR * 2) + inode_map_size + zone_map_size;
+   inode_table_addr = (SUPERBLOCK_ADDR * 2) + inode_map_size + zone_map_size;v // Was wrong, do we still need?
    inode_table_size = s_block.ninodes * INODE_SIZE / blocksize;
-   
-  fprintf(stderr,"inode table addr: %d\n",inode_table_addr);
+   block_index = 2+s_block.i_blocks+s_block.z_blocks;
 
-   printf("location: %ld\n",ftell(imagefile));
+   //TODO print calculated values?
+   
+   
+   fprintf(stderr,"inode table addr: %d\n",inode_table_addr);
+   
+
+   printf("location before seek: %ld\n",ftell(imagefile));
    /* Set file position to begining of the inodes */
-   if(fseek(imagefile, inode_table_addr, SEEK_SET) != 0) {
+   if(fseek(imagefile, block_index*blocksize, SEEK_SET) != 0) {
       perror(NULL);
       exit(errno);
    }
 
-   printf("location: %ld\n",ftell(imagefile));
+   printf("location after seek: %ld\n",ftell(imagefile));
 
 
    /* Read in the root inode from the imagefile */
@@ -63,7 +87,29 @@ int main(int argc, char **argv) {
       exit(EXIT_FAILURE);
    }
    
-   printf("location: %ld\n",ftell(imagefile));
+   /* If verbose, print useful info from root inode. */
+   if(verbose) {
+      printf("\n");
+      printf("File inode:\n");
+      printf("  uint16_t mode           0x%4x ",current_inode.mode);
+      printModeBits(current_inode.mode);
+      printf("  uint16_t links %15u\n",current_inode.links);
+      printf("  uint16_t uid %17u\n",current_inode.uid);
+      printf("  uint16_t gid %17u\n",current_inode.gid);
+      printf("  uint32_t size %16u\n",current_inode.size);
+      printf("  uint32_t atime %15d --- ",current_inode.atime);
+      printSecondsToReadable(current_inode.atime);
+      printf("  uint32_t mtime %15d --- ",current_inode.mtime);
+      printSecondsToReadable(current_inode.mtime);
+      printf("  uint32_t ctime %15d --- ",current_inode.ctime);
+      printSecondsToReadable(current_inode.ctime);
+      printf("\n");
+   }
+
+
+   printf("location after read: %ld\n",ftell(imagefile));
+   
+   
    if(strncmp(path, "/", 1) == 0) {
       file_found = 1;
    }
@@ -73,23 +119,6 @@ int main(int argc, char **argv) {
 
       
    }
-
-
-   if(verbose) {
-      printf("\n");
-      printf("File inode:\n");
-      printf("  uint16_t mode           0x%4x\n",current_inode.mode);
-      printf("  uint16_t links %15u\n",current_inode.links);
-      printf("  uint16_t uid %17u\n",current_inode.uid);
-      printf("  uint16_t gid %17u\n",current_inode.gid);
-      printf("  uint32_t size %16u\n",current_inode.size);
-      printf("  uint32_t atime %15d\n",current_inode.atime);
-      printf("  uint32_t mtime %15d\n",current_inode.mtime);
-      printf("  uint32_t ctime %15d\n",current_inode.ctime);
-      printf("\n");
-
-   }
-
    
    /* Current inode is the one we want to list */ 
 
@@ -171,7 +200,6 @@ void handle_partitions() {
 struct superblock validate_superblock(FILE *imagefile) {
    struct superblock s_block;
    int position = SUPERBLOCK_ADDR;
-   size_t temp = 0;
    
    /* Set file position to begining of superblock */
    if(fseek(imagefile, position, SEEK_SET) != 0) {
@@ -180,7 +208,7 @@ struct superblock validate_superblock(FILE *imagefile) {
    }
    
    /* Read in superblock struct from imagefile */
-   if(temp = fread(&s_block, sizeof(struct superblock), 1, imagefile) != 1) {
+   if(fread(&s_block, sizeof(struct superblock), 1, imagefile) != 1) {
       fprintf(stderr, "Unable to read superblock\n");
       //fprintf(stderr, "struct superblock size: %d\n",sizeof(struct superblock));
       //fprintf(stderr, "Read: %d\n",temp);
@@ -193,26 +221,23 @@ struct superblock validate_superblock(FILE *imagefile) {
       exit(EXIT_FAILURE);
    }
 
-   /* If verbose, print the useful infor. */
-   if(verbose) {
-      printf("\n");
-      printf("Superblock Contents:\n");
-      printf("Stored Fields:\n");
-      printf("  ninodes %12u\n",s_block.ninodes);
-      printf("  i_blocks %11d\n",s_block.i_blocks);
-      printf("  z_blocks %11d\n",s_block.z_blocks);
-      printf("  firstdata %10u\n",s_block.firstdata);
-      printf("  log_zone_size %6d\n",s_block.log_zone_size);
-      printf("  max_file %11u\n",s_block.max_file);
-      printf("  magic         0x%x\n",s_block.magic);
-      printf("  zones %14u\n",s_block.zones);
-      printf("  blocksize %10u\n",s_block.blocksize);
-      printf("  subversion %9u\n",s_block.subversion);
-      printf("\n");
-   }
-   
    return s_block;
 }
 
 
-   
+/* Prints out time in the form: DayName MonthName Day Hour:Minute:Second Year
+ */
+void printSecondsToReadable(int32_t time) {
+
+}
+
+
+/* Prints out mode in tthe form: (drwxrwxrwx) */
+void printModeBits(uint16_t mode) {
+
+}
+
+
+
+
+
