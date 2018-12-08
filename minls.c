@@ -16,7 +16,9 @@ static int verbose = 0;
 int main(int argc, char **argv) {
    FILE *imagefile; 
    struct superblock s_block;
+   struct dirent dir_entry;
    int zone_size, inode_map_size, zone_map_size, blocksize, inode_table_size;
+   int bytes_left, zone_bytes_read, current_zone_size, i;
    int inode_table_addr;
    int file_found = 0;
    int path_size;
@@ -61,16 +63,13 @@ int main(int argc, char **argv) {
    zone_size = blocksize << s_block.log_zone_size;
    inode_map_size = s_block.i_blocks * blocksize;
    zone_map_size = s_block.z_blocks * blocksize;
-   inode_table_addr = (SUPERBLOCK_ADDR * 2) + inode_map_size + zone_map_size;v // Was wrong, do we still need?
+   inode_table_addr = (SUPERBLOCK_ADDR * 2) + inode_map_size + zone_map_size;
    inode_table_size = s_block.ninodes * INODE_SIZE / blocksize;
    block_index = 2+s_block.i_blocks+s_block.z_blocks;
 
    //TODO print calculated values?
    
    
-   fprintf(stderr,"inode table addr: %d\n",inode_table_addr);
-   
-
    printf("location before seek: %ld\n",ftell(imagefile));
    /* Set file position to begining of the inodes */
    if(fseek(imagefile, block_index*blocksize, SEEK_SET) != 0) {
@@ -122,7 +121,38 @@ int main(int argc, char **argv) {
    
    /* Current inode is the one we want to list */ 
 
-   //TODO Print the listing
+   /* Check if the inode is for a directory */
+   if(current_inode.mode & 0xF000 == 0xF000) {
+      bytes_left = current_inode.size;
+      /* Loop over all dirints in the directory and print them out */
+      while(bytes_left > 63) {
+         /* First look in all direct zones for entires */
+         for(i = 0; i < DIRECT_ZONES; i++) {
+            if(current_inode.zone[i] != 0) {
+               /* Seek the file pointer to the correct zone */
+               if(fseek(imagefile, (s_block.firstdata + current_inode.zone[i]) * zone_size, SEEK_SET) != 0) {
+                  perror(NULL);
+                  exit(errno);
+               }
+               /* Start copying and printing data from zone */
+               for(zone_bytes_read = 0; zone_bytes_read < zone_size; zone_bytes_read += 64) {
+                  /* Read in dirent and display data */
+                  if(fread(&dir_entry, sizeof(struct dirent), 1, imagefile) != 1) {
+                     fprintf(stderr, "Unable to read dirent\n");
+                     exit(EXIT_FAILURE);
+                  }
+                  if(dir_entry.inode != 0) 
+                     printf("%.60s\n", dir_entry.name);
+                  bytes_left -= 64;
+                  if(bytes_left <= 0) 
+                     return 0;
+               }
+            }
+         }
+      }
+   }
+   /* Check if the inode is for a regular file */
+   
 
    return 0;
 }
